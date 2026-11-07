@@ -1,0 +1,211 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+enum Role {
+  STUDENT
+  TEACHER
+  ADMIN
+}
+
+enum AttendanceStatus {
+  PRESENT
+  ABSENT
+  JUSTIFIED
+  LATE
+}
+
+enum StudentStatus {
+  ACTIVE
+  INACTIVE
+  SUSPENDED
+}
+
+enum StudentNoteType {
+  TECHNICAL
+  DISCIPLINARY
+}
+
+model Person {
+  id        Int       @id @default(autoincrement())
+  name      String
+  email     String?   
+  phone     String?
+  cpf       String?   @unique
+  birthDate DateTime?
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  user           User?
+  studentProfile StudentProfile?
+  teacherProfile TeacherProfile?
+
+  @@map("persons")
+}
+
+
+model User {
+  id            Int      @id @default(autoincrement())
+  email         String   @unique
+  password      String
+  role          Role
+  isActive      Boolean  @default(true)
+  emailVerified Boolean  @default(false)
+  lastLoginAt   DateTime?
+  
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  personId      Int      @unique
+  person        Person   @relation(fields: [personId], references: [id], onDelete: Cascade)
+
+  @@map("users")
+}
+
+model StudentProfile {
+  id                 Int           @id @default(autoincrement())
+  registrationNumber String        @unique
+  status             StudentStatus @default(ACTIVE)
+  photo               String?
+  
+
+  responsibleName    String?
+  responsiblePhone   String?
+  emergencyContact   String?
+  
+  enrollmentDate     DateTime      @default(now())
+  createdAt          DateTime      @default(now())
+  updatedAt          DateTime      @updatedAt
+
+  personId           Int           @unique
+  person             Person        @relation(fields: [personId], references: [id], onDelete: Cascade)
+
+  attendances        Attendance[]
+  classEnrollments   ClassStudent[]
+  notes              StudentNote[]
+  
+  @@map("student_profiles")
+}
+
+// ========================================
+// TEACHER PROFILE
+// ========================================
+
+model TeacherProfile {
+  id             Int      @id @default(autoincrement())
+  specialization String?
+  hireDate       DateTime @default(now())
+  
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  personId       Int      @unique
+  person         Person   @relation(fields: [personId], references: [id], onDelete: Cascade)
+
+  classes        Class[]
+  studentNotes  StudentNote[]
+  
+  @@map("teacher_profiles")
+}
+
+
+model Class {
+  id          Int      @id @default(autoincrement())
+  name        String   
+  description String?
+  schedule    String?  
+  startDate   DateTime
+  endDate     DateTime?
+  isActive    Boolean  @default(true)
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  teacherId   Int
+  teacher     TeacherProfile @relation(fields: [teacherId], references: [id])
+  students    ClassStudent[]
+  lessons     Lesson[]
+  
+  @@map("classes")
+}
+
+model ClassStudent {
+  id         Int      @id @default(autoincrement())
+  
+  classId    Int
+  class      Class    @relation(fields: [classId], references: [id], onDelete: Cascade)
+  
+  studentId  Int
+  student    StudentProfile @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  
+  enrolledAt DateTime @default(now())
+  u1         Float?
+  u2         Float?
+  u3         Float?
+  recoveryExam Float?
+  finalExam  Float?
+  
+  @@unique([classId, studentId])
+  @@map("class_students")
+}
+
+
+model Lesson {
+  id          Int      @id @default(autoincrement())
+  
+  classId     Int
+  class       Class    @relation(fields: [classId], references: [id], onDelete: Cascade)
+  
+  date        DateTime
+  topic       String?  
+  description String?  @db.Text
+  duration    Int?     
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  attendances Attendance[]
+  
+  @@map("lessons")
+}
+
+model Attendance {
+  id        Int              @id @default(autoincrement())
+  
+  lessonId  Int
+  lesson    Lesson           @relation(fields: [lessonId], references: [id], onDelete: Cascade)
+  
+  studentId Int
+  student   StudentProfile   @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  
+  status    AttendanceStatus @default(PRESENT)
+  checkedAt DateTime?
+  notes     String?
+  
+  createdAt DateTime         @default(now())
+  updatedAt DateTime         @updatedAt
+
+  @@unique([lessonId, studentId]) 
+  @@map("attendances")
+}
+
+model StudentNote {
+  id         Int             @id @default(autoincrement())
+  studentId  Int
+  teacherId  Int
+  type       StudentNoteType
+  content    String          @db.Text
+  recordedAt DateTime        @default(now())
+  createdAt  DateTime        @default(now())
+  seedKey    String?         @unique
+
+  student StudentProfile @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  teacher TeacherProfile @relation(fields: [teacherId], references: [id], onDelete: Cascade)
+
+  @@index([studentId, teacherId])
+  @@map("student_notes")
+}
